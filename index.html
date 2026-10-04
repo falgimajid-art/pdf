@@ -95,9 +95,24 @@ $('go').onclick=async function(){
       }
     }
     var blob=pdf.output('blob');
-    var dl=window.claude&&await window.claude.use('downloads');
+    var dl=null;
+    try{dl=window.claude&&await window.claude.use('downloads');}catch(_){}
     if(dl){await dl.save({filename:'images.pdf',data:blob});msg.textContent='تم ✅';}
-    else{msg.textContent='الحفظ غير متاح هنا.';}
+    else{
+      var file=new File([blob],'images.pdf',{type:'application/pdf'});
+      var shared=false;
+      if(navigator.canShare&&navigator.canShare({files:[file]})){
+        try{await navigator.share({files:[file],title:'images.pdf'});shared=true;}catch(_){}
+      }
+      var u=URL.createObjectURL(blob);
+      var a=document.createElement('a');a.href=u;a.download='images.pdf';a.target='_blank';a.rel='noopener';
+      document.body.appendChild(a);if(!shared)a.click();a.remove();
+      msg.innerHTML='';
+      var l=document.createElement('a');l.href=u;l.download='images.pdf';l.target='_blank';l.rel='noopener';
+      l.textContent=shared?'تم ✅ (اضغط هنا لتحميله مرة أخرى)':'⬇ اضغط هنا لتحميل ملف PDF';
+      l.style.cssText='display:inline-block;margin-top:6px;padding:12px 18px;border-radius:12px;background:var(--card);border:1px solid var(--ac);color:var(--ac);font-weight:700;text-decoration:none';
+      msg.appendChild(l);
+    }
   }catch(e){msg.textContent=(e&&e.code==='declined')?'تم الإلغاء.':'حدث خطأ، جرّب مرة أخرى.'}
   $('go').disabled=!files.length;
 };
