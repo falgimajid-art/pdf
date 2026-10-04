@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>تحويل الصور إلى PDF</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--tx:#1b1f2a;--mut:#6b7280;--ac:#4f46e5;--bd:#e5e7eb;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12141a;--card:#1c1f28;--tx:#f1f3f8;--mut:#9aa1b2;--bd:#2d3140}}
+:root[data-theme="dark"]{--bg:#12141a;--card:#1c1f28;--tx:#f1f3f8;--mut:#9aa1b2;--bd:#2d3140}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif}
+main{max-width:520px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:22px;margin:8px 0 4px}
+p.s{color:var(--mut);margin:0 0 16px;font-size:14px}
+.drop{display:block;border:2px dashed var(--ac);border-radius:16px;padding:28px 12px;text-align:center;background:var(--card);cursor:pointer;font-weight:600;color:var(--ac)}
+.drop input{display:none}
+.list{display:flex;flex-direction:column;gap:10px;margin:16px 0}
+.item{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:8px}
+.item img{width:56px;height:56px;object-fit:cover;border-radius:8px;flex:none}
+.nm{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item button{border:1px solid var(--bd);background:var(--bg);color:var(--tx);border-radius:8px;width:34px;height:34px;font-size:16px}
+.go{width:100%;border:0;border-radius:14px;background:var(--ac);color:#fff;font-size:17px;font-weight:700;padding:15px}
+.go:disabled{opacity:.4}
+.opt{display:flex;gap:8px;align-items:center;margin-bottom:12px;font-size:14px}
+select{flex:1;padding:8px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx)}
+footer{margin-top:28px;padding-top:14px;border-top:1px solid var(--bd);text-align:center;color:var(--mut);font-size:13px;line-height:1.8}
+footer b{color:var(--tx)}
+#msg{text-align:center;color:var(--mut);font-size:13px;margin-top:10px;min-height:18px}
+</style>
+</head>
+<body>
+<main>
+<h1>📄 تحويل الصور إلى PDF</h1>
+<p class="s">اختر صورك، رتّبها، ثم حوّلها إلى ملف PDF واحد.</p>
+<label class="drop">＋ اختيار الصور<input id="f" type="file" accept="image/*" multiple></label>
+<div class="list" id="list"></div>
+<div class="opt"><span>حجم الصفحة:</span>
+<select id="mode"><option value="a4">A4 (الصورة داخل الصفحة)</option><option value="fit">بحجم الصورة نفسها</option></select></div>
+<button class="go" id="go" disabled>تحويل إلى PDF</button>
+<div id="msg"></div>
+<footer>هذا الموقع خاص بالمهندس <b>ماجد فلقي</b> والأستاذ <b>عبدالله آل مستنير</b></footer>
+</main>
+<script>
+var files=[],urls=[];
+var $=function(i){return document.getElementById(i)};
+$('f').addEventListener('change',function(e){
+  Array.prototype.forEach.call(e.target.files,function(f){files.push(f);urls.push(URL.createObjectURL(f))});
+  e.target.value='';render();
+});
+function render(){
+  var l=$('list');l.innerHTML='';
+  files.forEach(function(f,i){
+    var d=document.createElement('div');d.className='item';
+    var im=document.createElement('img');im.src=urls[i];
+    var n=document.createElement('div');n.className='nm';n.textContent=(i+1)+'. '+f.name;
+    d.appendChild(im);d.appendChild(n);
+    [['▲',-1],['▼',1],['✕',0]].forEach(function(b){
+      var x=document.createElement('button');x.textContent=b[0];
+      x.onclick=function(){
+        if(b[1]===0){files.splice(i,1);urls.splice(i,1)}
+        else{var j=i+b[1];if(j<0||j>=files.length)return;
+          [files[i],files[j]]=[files[j],files[i]];[urls[i],urls[j]]=[urls[j],urls[i]]}
+        render();
+      };d.appendChild(x);
+    });
+    l.appendChild(d);
+  });
+  $('go').disabled=!files.length;
+}
+function load(u){return new Promise(function(r,j){var i=new Image();i.onload=function(){r(i)};i.onerror=j;i.src=u})}
+async function toJpeg(img){
+  var c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;
+  var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0);
+  return c.toDataURL('image/jpeg',0.92);
+}
+$('go').onclick=async function(){
+  var msg=$('msg');$('go').disabled=true;msg.textContent='جارٍ التحويل...';
+  try{
+    var J=window.jspdf.jsPDF,pdf=null,fit=$('mode').value==='fit';
+    for(var i=0;i<urls.length;i++){
+      var img=await load(urls[i]),data=await toJpeg(img);
+      var w=img.naturalWidth,h=img.naturalHeight,o=w>h?'l':'p';
+      if(fit){
+        if(!pdf)pdf=new J({unit:'px',format:[w,h],orientation:o,hotfixes:['px_scaling']});
+        else pdf.addPage([w,h],o);
+        pdf.addImage(data,'JPEG',0,0,w,h);
+      }else{
+        if(!pdf)pdf=new J({unit:'mm',format:'a4',orientation:o});
+        else pdf.addPage('a4',o);
+        var pw=pdf.internal.pageSize.getWidth(),ph=pdf.internal.pageSize.getHeight(),m=8;
+        var s=Math.min((pw-2*m)/w,(ph-2*m)/h),dw=w*s,dh=h*s;
+        pdf.addImage(data,'JPEG',(pw-dw)/2,(ph-dh)/2,dw,dh);
+      }
+    }
+    var blob=pdf.output('blob');
+    var dl=window.claude&&await window.claude.use('downloads');
+    if(dl){await dl.save({filename:'images.pdf',data:blob});msg.textContent='تم ✅';}
+    else{msg.textContent='الحفظ غير متاح هنا.';}
+  }catch(e){msg.textContent=(e&&e.code==='declined')?'تم الإلغاء.':'حدث خطأ، جرّب مرة أخرى.'}
+  $('go').disabled=!files.length;
+};
+</script>
+</body>
+</html>
